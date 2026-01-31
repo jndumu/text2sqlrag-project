@@ -1,0 +1,11 @@
+{
+  "document_id": "8b483fac2cfe3f1d883125c471e01dd726892420db704532e5afdd03921d4815",
+  "original_filename": "document.pdf",
+  "upload_timestamp": "2026-01-29T18:35:55.252129Z",
+  "file_size_bytes": 51301,
+  "chunk_count": 3,
+  "embedding_model": "text-embedding-3-small",
+  "chunk_size": 512,
+  "chunk_overlap": 50,
+  "file_extension": "pdf"
+}
