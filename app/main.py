@@ -656,17 +656,13 @@ async def clear_cache(document_id: Optional[str] = None):
     """
     Clear cache for specific document or entire cache.
 
-    Clears BOTH:
-    - S3 document cache (chunks, embeddings, metadata)
-    - Redis query cache (RAG responses, SQL queries, embeddings)
-
     Args:
         document_id: Optional document ID to clear (if not provided, clears all cache)
 
     Returns:
         dict: Result of cache clearing operation
     """
-    global cache_service, query_cache_service
+    global cache_service
 
     if not cache_service:
         raise HTTPException(
@@ -678,29 +674,11 @@ async def clear_cache(document_id: Optional[str] = None):
         )
 
     try:
-        # Clear S3 document cache (chunks, embeddings, metadata)
-        s3_result = cache_service.clear_cache(doc_id=document_id)
+        result = cache_service.clear_cache(doc_id=document_id)
 
-        # Also clear Redis query cache if clearing entire cache
-        redis_cleared = False
-        redis_message = "Redis cache not enabled"
-
-        if not document_id and query_cache_service and query_cache_service.enabled:
-            # Clearing entire cache - also flush Redis
-            try:
-                redis_cleared = query_cache_service.flush_all()
-                redis_message = "Redis cache cleared successfully" if redis_cleared else "Redis flush failed"
-            except Exception as e:
-                redis_message = f"Redis flush error: {str(e)}"
-
-        # Combine results
         return {
-            "status": "success" if s3_result['cleared'] else "failed",
-            "s3_cache": s3_result,
-            "redis_cache": {
-                "cleared": redis_cleared,
-                "message": redis_message
-            }
+            "status": "success" if result['cleared'] else "failed",
+            **result
         }
 
     except Exception as e:
@@ -850,95 +828,6 @@ async def clear_query_cache(cache_type: Optional[str] = None):
         raise HTTPException(
             status_code=500,
             detail=ErrorResponse.internal_error("clear query cache", e)
-        )
-
-
-@app.delete("/vectors/clear", status_code=status.HTTP_200_OK, tags=["Vectors"])
-async def clear_vectors(
-    namespace: Optional[str] = "default",
-    confirm: bool = False
-):
-    """
-    Clear all vectors from the Pinecone vector database.
-
-    WARNING: This operation is irreversible! All document embeddings will be deleted.
-
-    Parameters:
-    - namespace: Namespace to clear (default: "default", use "*" for all namespaces)
-    - confirm: Must be set to true to proceed (safety confirmation)
-
-    Returns:
-    - status: Operation status (success/failed)
-    - namespaces_cleared: List of namespaces that were cleared
-    - vector_count_before: Total vectors before deletion
-    - vector_count_after: Total vectors after deletion
-    - vectors_deleted: Number of vectors deleted
-    - message: Human-readable status message
-
-    Example:
-        DELETE /vectors/clear?namespace=default&confirm=true
-    """
-    global vector_service
-
-    # Safety check: require confirmation
-    if not confirm:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "Confirmation required",
-                "message": "You must set confirm=true to clear vectors. This operation cannot be undone!",
-                "example": "/vectors/clear?namespace=default&confirm=true"
-            }
-        )
-
-    # Check if vector service is available
-    if not vector_service:
-        raise HTTPException(
-            status_code=503,
-            detail=ErrorResponse.service_unavailable(
-                "Vector database not initialized. Check PINECONE_API_KEY configuration."
-            )
-        )
-
-    try:
-        # Get current stats before deletion
-        stats_before = vector_service.get_index_stats()
-        total_vectors_before = stats_before.get('total_vector_count', 0)
-
-        logger.warning(
-            f"Vector clear requested: namespace={namespace}, "
-            f"total_vectors={total_vectors_before}"
-        )
-
-        # Perform deletion
-        result = vector_service.delete_all_vectors(namespace=namespace)
-
-        # Get stats after deletion to verify
-        stats_after = vector_service.get_index_stats()
-        total_vectors_after = stats_after.get('total_vector_count', 0)
-
-        # Build response
-        response = {
-            "status": result['status'],
-            "namespaces_cleared": result['namespaces_cleared'],
-            "vector_count_before": total_vectors_before,
-            "vector_count_after": total_vectors_after,
-            "vectors_deleted": total_vectors_before - total_vectors_after,
-            "message": result['message']
-        }
-
-        logger.info(
-            f"Vector clear completed: {response['vectors_deleted']} vectors deleted "
-            f"from {len(result['namespaces_cleared'])} namespace(s)"
-        )
-
-        return response
-
-    except Exception as e:
-        logger.error(f"Vector clear failed: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=ErrorResponse.internal_error("clear_vectors", e)
         )
 
 
@@ -1278,34 +1167,14 @@ def initialize_services():
         try:
             if settings.OPIK_API_KEY:
                 logger.info("Initializing OPIK monitoring...")
-
-                # Lambda-safe OPIK initialization
-                # Redirect stdin to /dev/null to prevent "EOF when reading a line" errors
-                import os
-                old_stdin = sys.stdin
-                try:
-                    # Open /dev/null for reading (works in Lambda)
-                    devnull = open(os.devnull, 'r')
-                    sys.stdin = devnull
-
-                    # Configure OPIK with API key
-                    from opik import configure
-                    configure(api_key=settings.OPIK_API_KEY)
-
-                    logger.info("✓ OPIK monitoring initialized!")
-                finally:
-                    # Restore original stdin
-                    sys.stdin = old_stdin
-                    try:
-                        devnull.close()
-                    except:
-                        pass
+                from opik import configure
+                configure(api_key=settings.OPIK_API_KEY)
+                logger.info("✓ OPIK monitoring initialized!")
             else:
                 logger.warning("OPIK available but API key not configured.")
                 logger.info("Monitoring will use local tracking only.")
         except Exception as e:
             logger.warning(f"Failed to initialize OPIK: {e}")
-            # Continue without OPIK - this is optional monitoring
     else:
         logger.info("OPIK not available (package not installed).")
 
@@ -1376,10 +1245,10 @@ def initialize_services():
 # Event handlers for startup/shutdown
 # NOTE: Startup event disabled for Lambda (initialization handled in lambda_handler.py)
 # Uncomment for local development with uvicorn
-@app.on_event("startup")
-async def startup_event():
-    """Execute tasks on application startup."""
-    initialize_services()
+# @app.on_event("startup")
+# async def startup_event():
+#     """Execute tasks on application startup."""
+#     initialize_services()
 
 
 @app.on_event("shutdown")
