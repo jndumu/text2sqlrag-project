@@ -93,4 +93,5 @@ jobs:
 
       - name: Wait for Config Update
         run: |
+        
           aws lambda wait function-updated --function-name ${{ env.LAMBDA_FUNCTION }}
