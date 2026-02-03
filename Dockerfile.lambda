@@ -63,25 +63,25 @@ RUN chmod -R 755 ${LAMBDA_TASK_ROOT}/app && \
 # ============================================================================
 # Stage 3: Final minimal runtime image
 # ============================================================================
-# Use pre-built base image with all system dependencies installed
-# This saves 20-25 minutes per deployment by eliminating dnf install
-#
-# Base image includes:
-# - PDF processing: poppler, poppler-utils, poppler-glib
-# - Rendering: cairo, pango, freetype, harfbuzz, fontconfig
-# - OpenGL (for Docling): mesa-libGL, mesa-libGLU, mesa-libgbm, libglvnd-*
-# - X11 libraries: libX11, libXext, libXrender, libxcb, libXau, etc.
-# - Image formats: libpng, libjpeg-turbo, libtiff, openjpeg2
-# - Build tools: gcc, gcc-c++
-# - System utilities: file-libs, glib2
-#
-# To rebuild base image (only when system deps change):
-#   ./build-base-image.sh
-#
-FROM 403705275896.dkr.ecr.us-east-1.amazonaws.com/lambda-python-deps:3.12
+# Use the official public Lambda python base image and install required system
+# dependencies here to avoid relying on a private pre-built base image.
+FROM public.ecr.aws/lambda/python:3.12
 
 # Set NLTK data path
 ENV NLTK_DATA=${LAMBDA_TASK_ROOT}/nltk_data
+
+# Install system packages required at runtime (mirrors items previously
+# included in the private base image). This increases build time but ensures
+# the image can be built on GitHub Actions without pulling a private image.
+RUN dnf install -y \
+    poppler-utils \
+    poppler-data || true && \
+    dnf install -y \
+    cairo pango freetype harfbuzz fontconfig \
+    mesa-libGL mesa-libGLU mesa-libgbm \
+    libglvnd* libpng libjpeg-turbo libtiff openjpeg2 || true && \
+    dnf install -y gcc gcc-c++ file-libs glib2 || true && \
+    dnf clean all || true
 
 # Copy everything from builder stage (permissions already fixed)
 COPY --from=builder ${LAMBDA_TASK_ROOT} ${LAMBDA_TASK_ROOT}
