@@ -28,6 +28,9 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: verify-aws
+        run: aws sts get-caller-identity
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
@@ -35,22 +38,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # We don't need manual docker login for pulling if amazon-ecr-login is used, 
-      # but we do need to ensure the base image is accessible. 
-      # The build-push-action handles this if we are logged in.
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: Dockerfile.lambda
-          # Using linux/amd64 as established for stability
           platforms: linux/amd64
           push: true
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
-          # Use GHA cache to speed up builds
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
@@ -66,25 +63,30 @@ jobs:
         run: |
           aws lambda wait function-updated --function-name ${{ env.LAMBDA_FUNCTION }}
 
-      # Robust environment configuration using a temporary JSON file
+      - name: Create Env Config (Safe)
+        run: |
+          # Use jq to safely construct JSON preventing syntax errors from special characters in secrets
+          jq -n \
+            --arg s3 "${{ secrets.S3_CACHE_BUCKET }}" \
+            --arg pine "${{ secrets.PINECONE_API_KEY }}" \
+            --arg openai "${{ secrets.OPENAI_API_KEY }}" \
+            --arg db "${{ secrets.DATABASE_URL }}" \
+            --arg redis "${{ secrets.UPSTASH_REDIS_URL }}" \
+            --arg redis_token "${{ secrets.UPSTASH_REDIS_TOKEN }}" \
+            '{Variables: {
+                STORAGE_BACKEND: "s3",
+                S3_CACHE_BUCKET: $s3,
+                PINECONE_API_KEY: $pine,
+                OPENAI_API_KEY: $openai,
+                DATABASE_URL: $db,
+                UPSTASH_REDIS_URL: $redis,
+                UPSTASH_REDIS_TOKEN: $redis_token,
+                ENVIRONMENT: "production",
+                HOME: "/tmp"
+             }}' > env.json
+
       - name: Update Lambda Configuration
         run: |
-          cat <<EOF > env.json
-          {
-            "Variables": {
-              "STORAGE_BACKEND": "s3",
-              "S3_CACHE_BUCKET": "${{ secrets.S3_CACHE_BUCKET }}",
-              "PINECONE_API_KEY": "${{ secrets.PINECONE_API_KEY }}",
-              "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}",
-              "DATABASE_URL": "${{ secrets.DATABASE_URL }}",
-              "UPSTASH_REDIS_URL": "${{ secrets.UPSTASH_REDIS_URL }}",
-              "UPSTASH_REDIS_TOKEN": "${{ secrets.UPSTASH_REDIS_TOKEN }}",
-              "ENVIRONMENT": "production",
-              "HOME": "/tmp"
-            }
-          }
-          EOF
-          
           aws lambda update-function-configuration \
             --function-name ${{ env.LAMBDA_FUNCTION }} \
             --environment file://env.json
