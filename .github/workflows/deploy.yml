@@ -52,19 +52,41 @@ jobs:
           cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
           cache-to: type=inline
 
-      - name: Update Lambda Function
+      - name: Update Lambda Function Code
         run: |
           aws lambda update-function-code \
             --function-name ${{ env.LAMBDA_FUNCTION }} \
             --image-uri ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }} \
             --architectures x86_64
 
-      - name: Wait for update to complete
+      - name: Wait for Code Update
         run: |
           aws lambda wait function-updated --function-name ${{ env.LAMBDA_FUNCTION }}
+
+      - name: Create Env Config
+        run: |
+          cat <<EOF > env.json
+          {
+            "Variables": {
+              "STORAGE_BACKEND": "s3",
+              "S3_CACHE_BUCKET": "${{ secrets.S3_CACHE_BUCKET }}",
+              "PINECONE_API_KEY": "${{ secrets.PINECONE_API_KEY }}",
+              "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}",
+              "DATABASE_URL": "${{ secrets.DATABASE_URL }}",
+              "UPSTASH_REDIS_URL": "${{ secrets.UPSTASH_REDIS_URL }}",
+              "UPSTASH_REDIS_TOKEN": "${{ secrets.UPSTASH_REDIS_TOKEN }}",
+              "ENVIRONMENT": "production",
+              "HOME": "/tmp"
+            }
+          }
+          EOF
 
       - name: Update Lambda Configuration
         run: |
           aws lambda update-function-configuration \
             --function-name ${{ env.LAMBDA_FUNCTION }} \
-            --environment "Variables={STORAGE_BACKEND=s3,S3_CACHE_BUCKET=${{ secrets.S3_CACHE_BUCKET }},PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }},OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }},DATABASE_URL=${{ secrets.DATABASE_URL }},UPSTASH_REDIS_URL=${{ secrets.UPSTASH_REDIS_URL }},UPSTASH_REDIS_TOKEN=${{ secrets.UPSTASH_REDIS_TOKEN }},ENVIRONMENT=production,HOME=/tmp}"
+            --environment file://env.json
+
+      - name: Wait for Config Update
+        run: |
+          aws lambda wait function-updated --function-name ${{ env.LAMBDA_FUNCTION }}
