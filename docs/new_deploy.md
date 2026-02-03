@@ -272,6 +272,7 @@ Default output format [None]: json
 Test that AWS CLI works:
 
 ```bash
+
 aws sts get-caller-identity
 ```
 
