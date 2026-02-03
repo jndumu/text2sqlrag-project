@@ -9,12 +9,13 @@ env:
   ECR_REPOSITORY: rag-text-to-sql-serverless
   LAMBDA_FUNCTION: rag-text-to-sql-serverless
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
 
     steps:
       - name: Checkout code
@@ -34,32 +35,25 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Pull base image
-        run: |
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
-          docker pull ${{ steps.login-ecr.outputs.registry }}/lambda-python-deps:3.12 || echo "Base image not found, build might fail if not cached locally"
+      # We don't need manual docker login for pulling if amazon-ecr-login is used, 
+      # but we do need to ensure the base image is accessible. 
+      # The build-push-action handles this if we are logged in.
 
-      - name: Build Docker image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          echo "Building Docker image..."
-          docker build \
-            --platform linux/amd64 \
-            -f Dockerfile.lambda \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-            .
-
-      - name: Push Docker image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          echo "Pushing Docker image..."
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.lambda
+          # Using linux/amd64 as established for stability
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          # Use GHA cache to speed up builds
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
 
       - name: Update Lambda Function Code
         run: |
@@ -72,7 +66,8 @@ jobs:
         run: |
           aws lambda wait function-updated --function-name ${{ env.LAMBDA_FUNCTION }}
 
-      - name: Create Env Config
+      # Robust environment configuration using a temporary JSON file
+      - name: Update Lambda Configuration
         run: |
           cat <<EOF > env.json
           {
@@ -89,9 +84,7 @@ jobs:
             }
           }
           EOF
-
-      - name: Update Lambda Configuration
-        run: |
+          
           aws lambda update-function-configuration \
             --function-name ${{ env.LAMBDA_FUNCTION }} \
             --environment file://env.json
