@@ -8,46 +8,18 @@ Now supports context-aware chunking with Docling for improved RAG quality.
 from typing import List, Dict, Any
 import tiktoken
 import logging
+from unstructured.partition.auto import partition
 from pathlib import Path
 from app.config import settings
 
 logger = logging.getLogger("rag_app.document_service")
 
 
-def parse_pdf_with_pypdf(file_path: str) -> str:
-    """
-    Parse PDF using pypdf library (bypasses pdfminer.six dependency issues).
-    
-    Args:
-        file_path: Path to the PDF file
-        
-    Returns:
-        str: Extracted text content
-    """
-    try:
-        from pypdf import PdfReader
-        
-        logger.info(f"Using pypdf for PDF parsing: {Path(file_path).name}")
-        reader = PdfReader(file_path)
-        text = ""
-        
-        for page_num, page in enumerate(reader.pages, 1):
-            page_text = page.extract_text()
-            if page_text:
-                text += f"\n\n--- Page {page_num} ---\n\n{page_text}"
-        
-        return text.strip()
-        
-    except Exception as e:
-        raise Exception(f"pypdf failed to parse PDF: {str(e)}")
-
-
 def parse_document(file_path: str) -> str:
     """
     Parse any document type and return extracted text.
     Uses fast direct read for simple text files (.txt, .md, .csv).
-    Uses pypdf for PDF files (bypasses pdfminer issues).
-    Uses Unstructured.io for other complex formats (DOCX, JSON, etc.).
+    Uses Unstructured.io for complex formats (PDF, DOCX, JSON, etc.).
 
     Args:
         file_path: Path to the document file
@@ -63,10 +35,9 @@ def parse_document(file_path: str) -> str:
     if not Path(file_path).exists():
         raise FileNotFoundError(f"File not found: {file_path}")
 
-    file_extension = Path(file_path).suffix.lower()
-    
     # Fast path for simple text files - bypass unstructured library
     # This is critical for Lambda performance (avoids 30+ second timeout)
+    file_extension = Path(file_path).suffix.lower()
     if file_extension in ['.txt', '.md', '.csv', '.log', '.json']:
         try:
             logger.info(f"Using fast text read for {file_extension} file")
@@ -81,21 +52,11 @@ def parse_document(file_path: str) -> str:
                 logger.warning(f"Fast text read failed: {e}, falling back to unstructured")
         except Exception as e:
             logger.warning(f"Fast text read failed: {e}, falling back to unstructured")
-    
-    # Use pypdf for PDF files (bypasses pdfminer.six dependency issues)
-    if file_extension == '.pdf':
-        try:
-            return parse_pdf_with_pypdf(file_path)
-        except Exception as e:
-            logger.warning(f"pypdf failed: {e}, trying unstructured as fallback")
-            # Continue to unstructured fallback below
 
     try:
-        # Use Unstructured.io's auto partition for complex formats (DOCX, etc.)
+        # Use Unstructured.io's auto partition for complex formats (PDF, DOCX, etc.)
         # strategy="fast" disables OCR (tesseract) for Lambda compatibility
         # OCR can be enabled by adding tesseract Lambda layer and using strategy="hi_res"
-        from unstructured.partition.auto import partition
-        
         logger.info(f"Using unstructured library for {file_extension} file")
         elements = partition(
             filename=file_path,
@@ -340,7 +301,7 @@ def parse_and_chunk_with_context(file_path: str, chunk_size: int = 512, min_chun
 
     # Check if Docling should be used (config flag)
     if not settings.USE_DOCKLING:
-        logger.info(f"Docling disabled via config (USE_DOCKLING=false), using pypdf/Unstructured + semchunk fallback")
+        logger.info(f"Docling disabled via config (USE_DOCKLING=false), using Unstructured + semchunk fallback")
         text = parse_document(file_path)
         chunks = chunk_text_semantic(text, chunk_size=chunk_size)
         logger.info(f"Semantic chunking complete: {len(chunks)} chunks")
