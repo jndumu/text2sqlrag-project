@@ -1,7 +1,7 @@
 .venv/
-.env/
-"*.env" 
-".env" 
-"notebooks/.env" 
-".env" 
-"notebooks/.env" 
+.env
+*.env
+notebooks/.env
+__pycache__/
+*.pyc
+.DS_Store
