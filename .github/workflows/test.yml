@@ -44,8 +44,8 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Lambda Docker image (x86-64)
-        run: docker build --platform linux/amd64 -f Dockerfile.lambda -t rag-lambda:test .
+      - name: Build Lambda Docker image (ARM64)
+        run: docker build --platform linux/arm64 -f Dockerfile.lambda -t rag-lambda:test .
 
       - name: Test image builds successfully
-        run: echo "✅ Docker image built successfully for x86-64 (AMD64)"
+        run: echo "✅ Docker image built successfully for ARM64"
