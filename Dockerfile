@@ -16,7 +16,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libmagic1 \
     # Required for PDF processing
     poppler-utils \
-    poppler-data \
     # Required for OCR in document processing
     tesseract-ocr \
     # Build tools for compiling Python packages
@@ -42,9 +41,6 @@ COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --user --no-warn-script-location -r requirements.txt
-
-# Download NLTK data (required for unstructured/langchain)
-RUN python -m nltk.downloader punkt averaged_perceptron_tagger -d /root/.local/share/nltk_data
 
 # Stage 3: Final runtime image
 FROM base as runtime

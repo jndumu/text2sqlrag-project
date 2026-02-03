@@ -47,9 +47,6 @@ RUN --mount=from=uv,source=/uv,target=/bin/uv \
     --mount=type=cache,target=/root/.cache/uv \
     uv pip install -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
 
-# Download NLTK data to lambda task root
-RUN python -m nltk.downloader punkt averaged_perceptron_tagger -d ${LAMBDA_TASK_ROOT}/nltk_data
-
 # Copy application code AFTER dependencies
 # This ensures code changes don't invalidate the package cache layer
 COPY app/ ${LAMBDA_TASK_ROOT}/app/
@@ -63,25 +60,12 @@ RUN chmod -R 755 ${LAMBDA_TASK_ROOT}/app && \
 # ============================================================================
 # Stage 3: Final minimal runtime image
 # ============================================================================
-# Use the official public Lambda python base image and install required system
-# dependencies here to avoid relying on a private pre-built base image.
 FROM public.ecr.aws/lambda/python:3.12
 
-# Set NLTK data path
-ENV NLTK_DATA=${LAMBDA_TASK_ROOT}/nltk_data
-
-# Install system packages required at runtime (mirrors items previously
-# included in the private base image). This increases build time but ensures
-# the image can be built on GitHub Actions without pulling a private image.
+# Install runtime dependencies (needed for the final image)
 RUN dnf install -y \
     poppler-utils \
-    poppler-data || true && \
-    dnf install -y \
-    cairo pango freetype harfbuzz fontconfig \
-    mesa-libGL mesa-libGLU mesa-libgbm \
-    libglvnd* libpng libjpeg-turbo libtiff openjpeg2 || true && \
-    dnf install -y gcc gcc-c++ file-libs glib2 || true && \
-    dnf clean all || true
+    && dnf clean all
 
 # Copy everything from builder stage (permissions already fixed)
 COPY --from=builder ${LAMBDA_TASK_ROOT} ${LAMBDA_TASK_ROOT}
