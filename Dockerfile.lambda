@@ -47,6 +47,9 @@ RUN --mount=from=uv,source=/uv,target=/bin/uv \
     --mount=type=cache,target=/root/.cache/uv \
     uv pip install -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
 
+# Download NLTK data to lambda task root
+RUN python -m nltk.downloader punkt averaged_perceptron_tagger -d ${LAMBDA_TASK_ROOT}/nltk_data
+
 # Copy application code AFTER dependencies
 # This ensures code changes don't invalidate the package cache layer
 COPY app/ ${LAMBDA_TASK_ROOT}/app/
@@ -66,8 +69,8 @@ RUN chmod -R 755 ${LAMBDA_TASK_ROOT}/app && \
 # Base image includes:
 # - PDF processing: poppler, poppler-utils, poppler-glib
 # - Rendering: cairo, pango, freetype, harfbuzz, fontconfig
-# - OpenGL: mesa-libGL, mesa-libGLU, mesa-libgbm, libglvnd-*
-# - X11: libX11, libXext, libXrender, libxcb, libXau, etc.
+# - OpenGL (for Docling): mesa-libGL, mesa-libGLU, mesa-libgbm, libglvnd-*
+# - X11 libraries: libX11, libXext, libXrender, libxcb, libXau, etc.
 # - Image formats: libpng, libjpeg-turbo, libtiff, openjpeg2
 # - Build tools: gcc, gcc-c++
 # - System utilities: file-libs, glib2
@@ -75,7 +78,10 @@ RUN chmod -R 755 ${LAMBDA_TASK_ROOT}/app && \
 # To rebuild base image (only when system deps change):
 #   ./build-base-image.sh
 #
-FROM 685057748560.dkr.ecr.us-east-1.amazonaws.com/lambda-python-deps:3.12
+FROM 403705275896.dkr.ecr.us-east-1.amazonaws.com/lambda-python-deps:3.12
+
+# Set NLTK data path
+ENV NLTK_DATA=${LAMBDA_TASK_ROOT}/nltk_data
 
 # Copy everything from builder stage (permissions already fixed)
 COPY --from=builder ${LAMBDA_TASK_ROOT} ${LAMBDA_TASK_ROOT}
