@@ -3,11 +3,10 @@ name: Deploy to AWS Lambda
 on:
   push:
     branches: [main]
-    
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: rag-text-to-sql-serverless-me
+  ECR_REPOSITORY: rag-text-to-sql-me
   LAMBDA_FUNCTION: rag-text-to-sql-serverless-me
 
 permissions:
@@ -36,9 +35,6 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # Removed setup-buildx-action to use default docker driver which shares host credentials
-      # This ensures the FROM instruction can pull the private base image
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -49,15 +45,13 @@ jobs:
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
-          # Removed gha cache as it requires buildx container driver
           provenance: false
 
       - name: Update Lambda Function Code
         run: |
           aws lambda update-function-code \
             --function-name ${{ env.LAMBDA_FUNCTION }} \
-            --image-uri ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }} \
-            --architectures x86_64
+            --image-uri ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
 
       - name: Wait for Code Update
         run: |
@@ -65,8 +59,6 @@ jobs:
 
       - name: Create Env Config (Safe)
         run: |
-          # Use jq to safely construct JSON preventing syntax errors from special characters in secrets
-          # (Ensure jq is installed, which it is on ubuntu-latest)
           jq -n \
             --arg s3 "${{ secrets.S3_CACHE_BUCKET }}" \
             --arg pine "${{ secrets.PINECONE_API_KEY }}" \
@@ -89,7 +81,6 @@ jobs:
       - name: Update Lambda Configuration
         run: |
           aws lambda update-function-configuration \
-
             --function-name ${{ env.LAMBDA_FUNCTION }} \
             --environment file://env.json
 
