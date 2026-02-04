@@ -7,7 +7,7 @@ on:
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: rag-text-to-sql-me
-  LAMBDA_FUNCTION: rag-text-to-sql-serverless-me
+  LAMBDA_FUNCTION: rag-text-to-sql-me
 
 permissions:
   id-token: write
