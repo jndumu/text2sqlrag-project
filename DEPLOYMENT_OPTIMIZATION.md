@@ -38,7 +38,7 @@ RUN dnf install -y [30+ packages...] # Takes 20-25 minutes
 
 **After:**
 ```dockerfile
-FROM 403705275896.dkr.ecr.us-east-1.amazonaws.com/lambda-python-deps:3.12
+FROM 685057748560.dkr.ecr.us-east-1.amazonaws.com/lambda-python-deps:3.12
 # All dependencies already installed - instant!
 ```
 
@@ -49,7 +49,7 @@ FROM 403705275896.dkr.ecr.us-east-1.amazonaws.com/lambda-python-deps:3.12
 
 **Base Image URI:**
 ```
-403705275896.dkr.ecr.us-east-1.amazonaws.com/lambda-python-deps:3.12
+685057748560.dkr.ecr.us-east-1.amazonaws.com/lambda-python-deps:3.12
 ```
 
 **Update Frequency:** Only rebuild base image when system dependencies change (rarely)
@@ -403,7 +403,7 @@ git tag v1.0.0 && git push origin v1.0.0
 
 2. Check base image includes all required packages:
    ```bash
-   docker run --rm 403705275896.dkr.ecr.us-east-1.amazonaws.com/lambda-python-deps:3.12 \
+   docker run --rm 685057748560.dkr.ecr.us-east-1.amazonaws.com/lambda-python-deps:3.12 \
      rpm -qa | grep -E "poppler|mesa|cairo"
    ```
 
