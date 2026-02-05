@@ -35,7 +35,6 @@ RUN dnf install -y \
     poppler \
     poppler-utils \
     poppler-glib \
-    poppler-data \
     \
     # --- Rendering stack (REQUIRED for Docling) ---
     cairo \
