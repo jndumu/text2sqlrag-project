@@ -3,8 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: rag-text-to-sql
-    image: rag-text-to-sql:latest
+    container_name: rag-text-to-sql-me
+    image: rag-text-to-sql-me:latest
     ports:
       - "8000:8000"
     volumes:
