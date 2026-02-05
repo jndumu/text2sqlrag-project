@@ -1,5 +1,5 @@
 # Complete AWS Deployment Guide for Fresh Account
-## Multi-Source RAG + Text-to-SQL System
+## Multi-Source RAG + Text-to-SQL Systems
 
 **Last Updated:** 2026-01-25
 **Target Architecture:** AWS Lambda (x86-64/AMD64) + Lambda Function URL + ECR + S3
@@ -272,7 +272,6 @@ Default output format [None]: json
 Test that AWS CLI works:
 
 ```bash
-
 aws sts get-caller-identity
 ```
 
@@ -526,7 +525,7 @@ cat > /tmp/s3-lifecycle.json <<'EOF'
 {
   "Rules": [
     {
-      "Id": "DeleteOldCache",
+      "ID": "DeleteOldCache",
       "Status": "Enabled",
       "Filter": {},
       "Expiration": {
