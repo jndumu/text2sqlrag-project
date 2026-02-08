@@ -60,22 +60,29 @@ RUN chmod -R 755 ${LAMBDA_TASK_ROOT}/app && \
 # ============================================================================
 # Stage 3: Final minimal runtime image
 # ============================================================================
-# Use pre-built base image with all system dependencies installed
-# This saves 20-25 minutes per deployment by eliminating dnf install
-#
-# Base image includes:
-# - PDF processing: poppler, poppler-utils, poppler-glib
-# - Rendering: cairo, pango, freetype, harfbuzz, fontconfig
-# - OpenGL: mesa-libGL, mesa-libGLU, mesa-libgbm, libglvnd-*
-# - X11: libX11, libXext, libXrender, libxcb, libXau, etc.
-# - Image formats: libpng, libjpeg-turbo, libtiff, openjpeg2
-# - Build tools: gcc, gcc-c++
-# - System utilities: file-libs, glib2
-#
-# To rebuild base image (only when system deps change):
-#   ./build-base-image.sh
-#
-FROM 403705275896.dkr.ecr.us-east-1.amazonaws.com/lambda-python-deps:3.12
+# Accept build argument for base image URI (dynamically set by GitHub Actions workflow)
+ARG BASE_IMAGE_URI
+
+# Use base image if provided, otherwise fall back to public image with auto-install
+FROM ${BASE_IMAGE_URI:-public.ecr.aws/lambda/python:3.12}
+
+# If using fallback public image (base image not available), install runtime dependencies
+# This ensures the build never fails, but will be slower on first deployment
+RUN if [ -z "${BASE_IMAGE_URI}" ] || ! docker image inspect "${BASE_IMAGE_URI}" > /dev/null 2>&1; then \
+      echo "📦 Installing runtime dependencies (base image not available)..." && \
+      dnf install -y \
+        poppler poppler-utils poppler-glib \
+        cairo pango freetype harfbuzz fontconfig \
+        mesa-libGL mesa-libGLU mesa-libgbm \
+        libglvnd-glx libglvnd-egl \
+        libX11 libXext libXrender libxcb libXau \
+        libXdamage libXfixes libXxf86vm \
+        libpng libjpeg-turbo libtiff openjpeg2 \
+        gcc gcc-c++ file-libs glib2 \
+        && dnf clean all && rm -rf /var/cache/dnf; \
+    else \
+      echo "✅ Using pre-built base image with all dependencies"; \
+    fi
 
 # Copy everything from builder stage (permissions already fixed)
 COPY --from=builder ${LAMBDA_TASK_ROOT} ${LAMBDA_TASK_ROOT}
