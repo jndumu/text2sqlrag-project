@@ -35,13 +35,12 @@ RUN chmod -R 755 ${LAMBDA_TASK_ROOT}/app && \
 # ============================================================================
 # Stage 3: Final runtime image using pre-built base
 # ============================================================================
-# The ECR_REGISTRY must be passed as build arg
+# Accept ECR registry as build argument (required)
 ARG ECR_REGISTRY
-ARG BASE_IMAGE_REPOSITORY=lambda-python-deps
-ARG BASE_IMAGE_TAG=3.12
 
-# Use the pre-built base image from ECR
-FROM ${ECR_REGISTRY}/${BASE_IMAGE_REPOSITORY}:${BASE_IMAGE_TAG}
+# Use the pre-built base image from ECR with hardcoded repo name and tag
+# These match what's defined in the workflow env vars
+FROM ${ECR_REGISTRY}/lambda-python-deps:3.12
 
 # Copy Python packages from builder
 COPY --from=builder ${LAMBDA_TASK_ROOT} ${LAMBDA_TASK_ROOT}
