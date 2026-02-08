@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1.7
 
 # Cross-Platform Build Support:
-# - For ARM64 (recommended): docker build --platform linux/arm64 ...
-# - For x86_64: docker build --platform linux/amd64 ...
-# See CROSS_PLATFORM_BUILD.md for detailed instructions
+# - For x86-64 (current): docker build --platform linux/amd64 ...
+# - For ARM64: docker build --platform linux/arm64 ...
+# Platform is specified via GitHub Actions buildx configuration
 
 # ============================================================================
 # Stage 1: Import UV binary from official image
@@ -45,7 +45,7 @@ COPY requirements.txt .
 # - Packages install to LAMBDA_TASK_ROOT for Lambda compatibility
 RUN --mount=from=uv,source=/uv,target=/bin/uv \
     --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --no-cache -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
+    uv pip install -r requirements.txt --target "${LAMBDA_TASK_ROOT}" --index-strategy unsafe-best-match
 
 # Copy application code AFTER dependencies
 # This ensures code changes don't invalidate the package cache layer
@@ -60,7 +60,22 @@ RUN chmod -R 755 ${LAMBDA_TASK_ROOT}/app && \
 # ============================================================================
 # Stage 3: Final minimal runtime image
 # ============================================================================
-FROM public.ecr.aws/lambda/python:3.12
+# Use pre-built base image with all system dependencies installed
+# This saves 20-25 minutes per deployment by eliminating dnf install
+#
+# Base image includes:
+# - PDF processing: poppler, poppler-utils, poppler-glib
+# - Rendering: cairo, pango, freetype, harfbuzz, fontconfig
+# - OpenGL: mesa-libGL, mesa-libGLU, mesa-libgbm, libglvnd-*
+# - X11: libX11, libXext, libXrender, libxcb, libXau, etc.
+# - Image formats: libpng, libjpeg-turbo, libtiff, openjpeg2
+# - Build tools: gcc, gcc-c++
+# - System utilities: file-libs, glib2
+#
+# To rebuild base image (only when system deps change):
+#   ./build-base-image.sh
+#
+FROM 403705275896.dkr.ecr.us-east-1.amazonaws.com/lambda-python-deps:3.12
 
 # Copy everything from builder stage (permissions already fixed)
 COPY --from=builder ${LAMBDA_TASK_ROOT} ${LAMBDA_TASK_ROOT}
