@@ -77,6 +77,7 @@ RUN chmod -R 755 ${LAMBDA_TASK_ROOT}/app && \
 #
 # IMPORTANT: Replace with YOUR AWS account ID
 # Accept build arguments for dynamic base image reference
+# ARG must be declared BEFORE the FROM statement where it's used
 ARG ECR_REGISTRY=403705275896.dkr.ecr.us-east-1.amazonaws.com
 ARG BASE_IMAGE_REPOSITORY=lambda-python-deps
 ARG BASE_IMAGE_TAG=3.12
