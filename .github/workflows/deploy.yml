@@ -115,6 +115,47 @@ jobs:
           echo "Registry: ${{ steps.login-ecr.outputs.registry }}"
           echo ""
 
+      - name: Create ECR repositories if they don't exist
+        run: |
+          echo "=========================================="
+          echo "🏗️  Ensuring ECR Repositories Exist"
+          echo "=========================================="
+          echo ""
+          
+          # Create base image repository if it doesn't exist
+          echo "📦 Checking base image repository: ${{ env.BASE_IMAGE_REPOSITORY }}"
+          if aws ecr describe-repositories --repository-names ${{ env.BASE_IMAGE_REPOSITORY }} --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            echo "   ✅ Repository exists"
+          else
+            echo "   ⚠️  Repository not found - creating..."
+            aws ecr create-repository \
+              --repository-name ${{ env.BASE_IMAGE_REPOSITORY }} \
+              --region ${{ env.AWS_REGION }} \
+              --image-scanning-configuration scanOnPush=true \
+              --encryption-configuration encryptionType=AES256
+            echo "   ✅ Base image repository created: ${{ env.BASE_IMAGE_REPOSITORY }}"
+          fi
+          echo ""
+          
+          # Create application repository if it doesn't exist
+          echo "📦 Checking application repository: ${{ env.ECR_REPOSITORY }}"
+          if aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            echo "   ✅ Repository exists"
+          else
+            echo "   ⚠️  Repository not found - creating..."
+            aws ecr create-repository \
+              --repository-name ${{ env.ECR_REPOSITORY }} \
+              --region ${{ env.AWS_REGION }} \
+              --image-scanning-configuration scanOnPush=true \
+              --encryption-configuration encryptionType=AES256
+            echo "   ✅ Application repository created: ${{ env.ECR_REPOSITORY }}"
+          fi
+          echo ""
+          echo "=========================================="
+          echo "✅ All ECR Repositories Ready"
+          echo "=========================================="
+          echo ""
+
       - name: Check and build base image if needed
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
