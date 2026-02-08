@@ -410,7 +410,8 @@ jobs:
               "TRANSFORMERS_CACHE": "/tmp/.cache/huggingface",
               "UNSTRUCTURED_CACHE_DIR": "/tmp/.cache/unstructured",
               "DOCLING_CACHE_DIR": "/tmp/.cache/docling",
-              "USE_DOCKLING": "false"
+              "USE_DOCKLING": "false",
+              "PGHOST_PREFER_IPV4": "1"
             }
           }
           EOF
