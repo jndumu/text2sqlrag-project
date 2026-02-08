@@ -148,5 +148,5 @@ jobs:
             echo "   - OpenGL: mesa-libGL, mesa-libGLU, mesa-libgbm"
             echo "   - X11: libX11, libXext, libXrender, libxcb"
             echo "   - Image formats: libpng, libjpeg-turbo, libtiff"
-            echo "   - Build tools: gcc, gcc
-
+            echo "   - Build tools: gcc, gcc      
+
