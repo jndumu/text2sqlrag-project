@@ -76,7 +76,12 @@ RUN chmod -R 755 ${LAMBDA_TASK_ROOT}/app && \
 #   ./build-base-image.sh
 #
 # IMPORTANT: Replace with YOUR AWS account ID
-FROM 403705275896.dkr.ecr.us-east-1.amazonaws.com/lambda-python-deps:3.12
+# Accept build arguments for dynamic base image reference
+ARG ECR_REGISTRY=403705275896.dkr.ecr.us-east-1.amazonaws.com
+ARG BASE_IMAGE_REPOSITORY=lambda-python-deps
+ARG BASE_IMAGE_TAG=3.12
+
+FROM ${ECR_REGISTRY}/${BASE_IMAGE_REPOSITORY}:${BASE_IMAGE_TAG}
 
 # Copy everything from builder stage (permissions already fixed)
 COPY --from=builder ${LAMBDA_TASK_ROOT} ${LAMBDA_TASK_ROOT}
